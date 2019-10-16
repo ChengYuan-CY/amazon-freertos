@@ -1,5 +1,5 @@
 /*
- * FreeRTOS+TCP V2.0.11
+ * FreeRTOS+TCP V2.1.0
  * Copyright (C) 2017 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -588,6 +588,12 @@ NetworkBufferDescriptor_t *pxNetworkBuffer;
 void vARPGenerateRequestPacket( NetworkBufferDescriptor_t * const pxNetworkBuffer )
 {
 ARPPacket_t *pxARPPacket;
+
+        /* Buffer allocation ensures that buffers always have space
+	   for an ARP packet. See buffer allocation implementations 1
+	   and 2 under portable/BufferManagement. */
+        configASSERT( pxNetworkBuffer );
+        configASSERT( pxNetworkBuffer->xDataLength >= sizeof(ARPPacket_t) );
 
 	pxARPPacket = ( ARPPacket_t * ) pxNetworkBuffer->pucEthernetBuffer;
 
