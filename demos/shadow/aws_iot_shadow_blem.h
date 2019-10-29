@@ -14,8 +14,8 @@
 
 //TODO 编写各种更新操作的种类类型，比如添加设备需要增加3级section，update的时候就需要构建适当的json文件
 typedef enum UPDATE_OPERATION{
-    ADD_DEVICE=2,
-    CHANGE_ENDPOINT_STATE=1,
+    LOCALLY_CHANGE_ENDPOINT_STATE=2,
+    CLOULD_CHANGE_ENDPOINT_STATE=1,
     UNKNOWN_OP=0
 }UpdateOperation_t;
 
@@ -71,7 +71,7 @@ typedef enum LightDefaultData{
                     "\"brightness\":\"%s\",                             \
                     "\"value\" :  {\"value\": \"%s\" },"                \
                     "\"property1\" : {\"default property1\": 0 },"      \
-                    "\"colorTemperatureInKelvin\" : \"%s\""             \
+                    "\"colorTemperatureInKelvin\" : %d"                 \
                     "},"                                                \
                 "\"Switch\":{"                                          \
                     "\"Switch value\": \"%s\""                          \
@@ -137,10 +137,11 @@ static Attribute_t analysisAttribute(uint8_t* data);
  * param attributeType the attribute type found
  * param stateValue the value that to be updated
  */
-static char * generateControlShadowDocument(Device_t deviceType, 
-                                     Attribute_t attributeType,
-                                     char* stateValue
-                                     );
+static char * generateControlShadowDocument(UpdateOperation_t operation,
+                                            Device_t deviceType, 
+                                            Attribute_t attributeType,
+                                            char* stateValue
+                                            );
 
 
 /**
@@ -189,6 +190,12 @@ static int retriveCloudCommand( IotMqttConnection_t mqttConnection,
                                 AwsIotShadowDocumentInfo_t getInfo,
                                 AwsIotShadowOperation_t getOperation,
                                 int status);
+
+/**
+ * write value to the uart port 
+ * @param command  the value to be written into uart port
+ *  */
+static void _write_command_into_uart(const char* command, size_t commandLength);
 
 /********************Json document templates *****************************/
 
@@ -270,7 +277,7 @@ static int retriveCloudCommand( IotMqttConnection_t mqttConnection,
            "\"desired\": {"                                             \
                "\"Lights\" :{"                                          \
                     "\"ON_OFF\":\"%s\","                                \
-                    "\"colorTemperatureInKelvin\" : \"%d\""             \
+                    "\"colorTemperatureInKelvin\" : %d "                \
                 "}"                                                     \
             "}"                                                         \
         "},"                                                            \
@@ -283,13 +290,37 @@ static int retriveCloudCommand( IotMqttConnection_t mqttConnection,
  * The shadow document will only update the part listed and leave the rest
  * untouched
  */
+#define SHADOW_LIGHT_JSON                                               \
+   "{"                                                                  \
+       "\"state\":{"                                                    \
+           "\"desired\": {"                                             \
+               "\"Lights\" :{"                                          \
+                    "\"ON_OFF\":\"%s\","                                \
+                    "\"colorTemperatureInKelvin\" : %d"                 \
+                "}"                                                     \
+            "},"                                                        \
+           "\"reported\": {"                                            \
+               "\"Lights\" :{"                                          \
+                    "\"ON_OFF\":\"%s\","                                \
+                    "\"colorTemperatureInKelvin\" : %d"                 \
+                "}"                                                     \
+            "}"                                                         \
+        "},"                                                            \
+        "\"clientToken\":\"%06lu\""                                     \
+    "}"                                                                 \
+
+#define SHADOW_LIGHT_JSON_SIZE     (sizeof(SHADOW_LIGHT_JSON))
+/** Update light reported status JSON 
+ * The shadow document will only update the part listed and leave the rest
+ * untouched
+ */
 #define SHADOW_REPORTED_LIGHT_JSON                                      \
    "{"                                                                  \
        "\"state\":{"                                                    \
            "\"reported\": {"                                            \
                "\"Lights\" :{"                                          \
                     "\"ON_OFF\":\"%s\","                                \
-                    "\"colorTemperatureInKelvin\" : \"%d\""             \
+                    "\"colorTemperatureInKelvin\" : %d"                 \
                 "}"                                                     \
             "}"                                                         \
         "},"                                                            \

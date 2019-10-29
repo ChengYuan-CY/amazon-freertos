@@ -72,7 +72,7 @@
 /**
  * @brief The timeout for Shadow and MQTT operations in this demo.
  */
-#define TIMEOUT_MS (20000)
+#define TIMEOUT_MS (10000)
 
 
 /*-----------------------------------------------------------*/
@@ -231,226 +231,19 @@ static int _establishMqttConnection(const char *pIdentifier,
                    connectInfo.pClientIdentifier,
                    connectInfo.clientIdentifierLength);
 
-        size_t connectNum = 0;
         /* Establish the MQTT connection. */
-        while(connectStatus != IOT_MQTT_SUCCESS)
-        {
-            connectStatus = IotMqtt_Connect(&networkInfo,
+        connectStatus = IotMqtt_Connect(&networkInfo,
                                         &connectInfo,
-                                        10000,
+                                        100000,
                                         pMqttConnection);
-            if (connectStatus != IOT_MQTT_SUCCESS)
-            {
-                connectNum++;
-                IotLogError("MQTT CONNECT returned error %s. connect number %d",
-                            IotMqtt_strerror(connectStatus),connectNum);
-            }
-        }   
-    }
 
-    return status;
-}
-
-/*-----------------------------------------------------------*/
-
-/**
- * @brief Parses the "state" key from the "previous" or "current" sections of a
- * Shadow updated document.
- *
- * @param[in] pUpdatedDocument The Shadow updated document to parse.
- * @param[in] updatedDocumentLength The length of `pUpdatedDocument`.
- * @param[in] pSectionKey Either "previous" or "current". Must be NULL-terminated.
- * @param[out] pState Set to the first character in "state".
- * @param[out] pStateLength Length of the "state" section.
- *
- * @return `true` if the "state" was found; `false` otherwise.
- */
-// static bool _getUpdatedState( const char * pUpdatedDocument,
-//                               size_t updatedDocumentLength,
-//                               const char * pSectionKey,
-//                               const char ** pState,
-//                               size_t * pStateLength )
-// {
-//     bool sectionFound = false, stateFound = false;
-//     const size_t sectionKeyLength = strlen( pSectionKey );
-//     const char * pSection = NULL;
-//     size_t sectionLength = 0;
-
-//     /* Find the given section in the updated document. */
-//     sectionFound = IotJsonUtils_FindJsonValue( pUpdatedDocument,
-//                                                updatedDocumentLength,
-//                                                pSectionKey,
-//                                                sectionKeyLength,
-//                                                &pSection,
-//                                                &sectionLength );
-
-//     if( sectionFound == true )
-//     {
-//         /* Find the "state" key within the "previous" or "current" section. */
-//         stateFound = IotJsonUtils_FindJsonValue( pSection,
-//                                                  sectionLength,
-//                                                  "state",
-//                                                  5,
-//                                                  pState,
-//                                                  pStateLength );
-//     }
-//     else
-//     {
-//         IotLogWarn( "Failed to find section %s in Shadow updated document.",
-//                     pSectionKey );
-//     }
-
-//     return stateFound;
-// }
-
-
-/*-----------------------------------------------------------*/
-
-// /**
-//  * @brief Shadow updated callback, invoked when the Shadow document changes.
-//  *
-//  * This function reports when a Shadow has been updated.
-//  *
-//  * @param[in] pCallbackContext Not used.
-//  * @param[in] pCallbackParam The received Shadow updated document.
-//  */
-// static void _shadowUpdatedCallback( void * pCallbackContext,
-//                                     AwsIotShadowCallbackParam_t * pCallbackParam )
-// {
-//     bool previousFound = false, currentFound = false;
-//     const char * pPrevious = NULL, * pCurrent = NULL;
-//     size_t previousLength = 0, currentLength = 0;
-
-//     /* Silence warnings about unused parameters. */
-//     ( void ) pCallbackContext;
-
-//     /* Find the previous Shadow document. */
-//     previousFound = _getUpdatedState( pCallbackParam->u.callback.pDocument,
-//                                       pCallbackParam->u.callback.documentLength,
-//                                       "previous",
-//                                       &pPrevious,
-//                                       &previousLength );
-
-//     /* Find the current Shadow document. */
-//     currentFound = _getUpdatedState( pCallbackParam->u.callback.pDocument,
-//                                      pCallbackParam->u.callback.documentLength,
-//                                      "current",
-//                                      &pCurrent,
-//                                      &currentLength );
-
-//     /* Log the previous and current states. */
-//     if( ( previousFound == true ) && ( currentFound == true ) )
-//     {
-//         IotLogInfo( "Shadow was updated!\r\n"
-//                     "Previous: {\"state\":%.*s}\r\n"
-//                     "Current:  {\"state\":%.*s}",
-//                     30,
-//                     pPrevious,
-//                     30,
-//                     pCurrent );
-//     }
-//     else
-//     {
-//         if( previousFound == false )
-//         {
-//             IotLogWarn( "Previous state not found in Shadow updated document." );
-//         }
-
-//         if( currentFound == false )
-//         {
-//             IotLogWarn( "Current state not found in Shadow updated document." );
-//         }
-//     }
-// }
-/**
- * @brief Shadow delta callback, invoked when the desired and updates Shadow
- * states differ.
- *
- * This function simulates a device updating its state in response to a Shadow.
- *
- * @param[in] pCallbackContext Not used.
- * @param[in] pCallbackParam The received Shadow delta document.
- */
-static void _shadowDeltaCallback( void * pCallbackContext,
-                                  AwsIotShadowCallbackParam_t * pCallbackParam )
-{
-    bool deltaFound = false;
-    bool onOffFound = false;
-    IotSemaphore_t * pDeltaSemaphore = pCallbackContext;
-
-    const char * pDelta = NULL;
-    size_t deltaLength = 0;
-    IotLogInfo("Received Document is:\r\n %.*s\r\n",pCallbackParam->u.callback.documentLength,
-                                               pCallbackParam->u.callback.pDocument);
-    /* Check if there is a different "ON_OFF" state in the Shadow. */
-    deltaFound = IotJsonUtils_FindJsonValue( pCallbackParam->u.callback.pDocument,
-                                            pCallbackParam->u.callback.documentLength,
-                                            "state",
-                                            5,
-                                            &pDelta,
-                                            &deltaLength );
-
-    IotLogInfo("\r\n");
-    IotLogInfo("pDelta is %.*s\r\n",deltaLength,pDelta);
-    if(deltaFound == true)
-    {   
-        onOffFound = IotJsonUtils_FindJsonValue( pDelta,
-                                                deltaLength,
-                                                "ON_OFF",
-                                                6,
-                                                NULL,
-                                                NULL);
-
-        if(onOffFound == true)
+        if (connectStatus != IOT_MQTT_SUCCESS)
         {
-        //write extracted command to uart
-        _write_command_into_uart(pDelta,deltaLength);
+            IotLogError("MQTT CONNECT returned error %s.",
+                        IotMqtt_strerror(connectStatus));
+
+            status = EXIT_FAILURE;
         }
-    /* Post to the delta semaphore to unblock the thread sending Shadow updates. */
-    IotSemaphore_Post( pDeltaSemaphore );
-    }
-}
-
-static int _setShadowCallbacks( IotSemaphore_t * pDeltaSemaphore,
-                                IotMqttConnection_t mqttConnection,
-                                const char * pThingName,
-                                size_t thingNameLength )
-{
-    int status = EXIT_SUCCESS;
-    AwsIotShadowError_t callbackStatus = AWS_IOT_SHADOW_STATUS_PENDING;
-    AwsIotShadowCallbackInfo_t deltaCallback = AWS_IOT_SHADOW_CALLBACK_INFO_INITIALIZER;
-                            //    updatedCallback = AWS_IOT_SHADOW_CALLBACK_INFO_INITIALIZER;
-
-    /* Set the functions for callbacks. */
-    deltaCallback.pCallbackContext = pDeltaSemaphore;
-    deltaCallback.function = _shadowDeltaCallback;
-    // updatedCallback.function = _shadowUpdatedCallback;
-
-    /* Set the delta callback, which notifies of different desired and reported
-     * Shadow states. */
-    callbackStatus = AwsIotShadow_SetDeltaCallback( mqttConnection,
-                                                    pThingName,
-                                                    thingNameLength,
-                                                    0,
-                                                    &deltaCallback );
-
-    // if( callbackStatus == AWS_IOT_SHADOW_SUCCESS )
-    // {
-    //     /* Set the updated callback, which notifies when a Shadow document is
-    //      * changed. */
-    //     callbackStatus = AwsIotShadow_SetUpdatedCallback( mqttConnection,
-    //                                                       pThingName,
-    //                                                       thingNameLength,
-    //                                                       0,
-    //                                                       &updatedCallback );
-    // }
-
-    if( callbackStatus != AWS_IOT_SHADOW_SUCCESS )
-    {
-        IotLogError( "Failed to set demo shadow callback, error %s.",
-                     AwsIotShadow_strerror( callbackStatus ) );
-
-        status = EXIT_FAILURE;
     }
 
     return status;
@@ -459,43 +252,43 @@ static int _setShadowCallbacks( IotSemaphore_t * pDeltaSemaphore,
 /*------------------------------------------------------------------------*/
 
 /*get specific value in the shadow document
-the maximum nested layers for the shadow document is 4
-shadow document format should be followed as below:
-    "{"                                                                \
-    "\"state\":{"                                                    \
-        "\"desired\": {"                                             \
-            "\"Lights\" :{"                                          \
-                "\"thing name\" : \"sample-light\","                  \
-                "\"device info\":\"000\","                          \
-                "\"ON_OFF\":\"%s\","                                \
-                "\"brightness\":\"%s\",                             \
-                "\"value\" :  {\"value\": \"%s\" },"                \
-                "\"property1\" : {\"default property1\": 0 },"      \
-                "\"colorTemperatureInKelvin\" : \"%s\""             \
-                "},"                                                \
-            "\"Switch\":{"                                          \
-                "\"Switch value\": \"%s\""                          \
-            "},"                                                    \
-            "\"Lock\":{"                                            \
-                "\"Lock value\": \"%s\""                            \
-            "}"                                                     \
-        "}"                                                         \
-    "}"                                                             \
-    "\"clientToken\":\"%06lu\""                                     \
-"}"                                                                 \  
-    */
-/**
- * The shadow document must be 4 nested layer like showed above, if you want to change
- * the structure of the shadow document, you need not only change this function, but also
- * change alexa skill and iot console document 
- * param receivedDocument Received shadow document from AwsIot_Get
- * param receivedDocumentLength Received shadow document length
- * param sectionId The section name, ie.state, delta etc
- * param desiredOrReportedId Desired or reported wanted
- * param attributeId Attribute wanted
- * param attributeGot [out] A pointer points to the attribute value got
- * param attributeLen [out] A pointer points to the length value
- */
+    the maximum nested layers for the shadow document is 4
+    shadow document format should be followed as below:
+     "{"                                                                \
+       "\"state\":{"                                                    \
+           "\"desired\": {"                                             \
+               "\"Lights\" :{"                                          \
+                  "\"thing name\" : \"sample-light\","                  \
+                    "\"device info\":\"000\","                          \
+                    "\"ON_OFF\":\"%s\","                                \
+                    "\"brightness\":\"%s\",                             \
+                    "\"value\" :  {\"value\": \"%s\" },"                \
+                    "\"property1\" : {\"default property1\": 0 },"      \
+                    "\"colorTemperatureInKelvin\" : \"%s\""             \
+                    "},"                                                \
+                "\"Switch\":{"                                          \
+                    "\"Switch value\": \"%s\""                          \
+                "},"                                                    \
+                "\"Lock\":{"                                            \
+                    "\"Lock value\": \"%s\""                            \
+                "}"                                                     \
+            "}"                                                         \
+        "}"                                                             \
+        "\"clientToken\":\"%06lu\""                                     \
+    "}"                                                                 \  
+     */
+    /**
+     * The shadow document must be 4 nested layer like showed above, if you want to change
+     * the structure of the shadow document, you need not only change this function, but also
+     * change alexa skill and iot console document 
+     * param receivedDocument Received shadow document from AwsIot_Get
+     * param receivedDocumentLength Received shadow document length
+     * param sectionId The section name, ie.state, delta etc
+     * param desiredOrReportedId Desired or reported wanted
+     * param attributeId Attribute wanted
+     * param attributeGot [out] A pointer points to the attribute value got
+     * param attributeLen [out] A pointer points to the length value
+     */
 static bool _getSpecificValue(const char* receivedDocument,
                               size_t receivedDocumentLength,
                               const char* sectionId,
@@ -587,7 +380,6 @@ static bool _getSpecificValue(const char* receivedDocument,
     {IotLogInfo("state section didn't find!");}
     return sectionFound;
 }
-
 /**
  * write value to the uart port 
  * @param command  the value to be written into uart port
@@ -598,7 +390,7 @@ static void _write_command_into_uart(const char* command, size_t commandLength)
 
     char value[commandLength+1];
     //clear buffer but left the last one 
-    memset(value,'\0',commandLength*sizeof(char));
+    memset(value,0,commandLength*sizeof(char));
 
     strncpy(value,command,commandLength);
     int result = 0;
@@ -618,35 +410,35 @@ static void _write_command_into_uart(const char* command, size_t commandLength)
         IotLogInfo("Write command to uart port successful! the data is :%.*s\n",commandLength,value);
     }
         //clear buffer but left the last one 
-    memset(value,'\0',commandLength*sizeof(value[0]));
+    memset(value,0,commandLength*sizeof(value[0]));
     
     return;
 }
 
 
 /*Get thing shadow from iot */
-static int _thingShadowOperation( IotSemaphore_t * pDeltaSemaphore,
-                                IotMqttConnection_t mqttConnection,
-                                const char * pThingName,
-                                size_t thingNameLength
+static int _thingShadowOperation( IotMqttConnection_t mqttConnection,
+                                  const char * pThingName,
+                                  size_t thingNameLength
                             )
 {
+    IotLogInfo("entered getThingshadow function");
     int status = EXIT_SUCCESS;
+
+    AwsIotShadowDocumentInfo_t getInfo = AWS_IOT_SHADOW_DOCUMENT_INFO_INITIALIZER;
+    
+    getInfo.pThingName = pThingName;
+    getInfo.thingNameLength = thingNameLength;
+    getInfo.u.get.mallocDocument = malloc;
+
+    AwsIotShadowOperation_t getOperation = AWS_IOT_SHADOW_OPERATION_INITIALIZER;
     /*using a while loop to continuously running the program */
     while(1)
     {
         //check if local has command to send to update the shadow document
         uint32_t length = uart_get_buffered_data_len(UART_NUM_1, (size_t*)&length);
         ESP_ERROR_CHECK(uart_get_buffered_data_len(UART_NUM_1, (size_t*)&length));          
-        
-        if( IotSemaphore_TimedWait( pDeltaSemaphore, 1000) == false )
-        {
-            if(( IotClock_GetTimeMs()/10000) == 0)
-            {
-                IotLogInfo( "No changes at %06d s",( long unsigned ) ( IotClock_GetTimeMs()/1000) );
-            }
-        }
-
+    
         if(length!=0)
         {  
             status = reportLocalChange( length,
@@ -657,17 +449,105 @@ static int _thingShadowOperation( IotSemaphore_t * pDeltaSemaphore,
             if(status != EXIT_SUCCESS)
             {
                 IotLogInfo("Report local change failed");
-                printf("Restarting now...\n");
-                esp_restart();
                 break;
             }  
         }
+        
+        status = retriveCloudCommand( mqttConnection,
+                                    getInfo,
+                                    getOperation,
+                                    status);
+        if(status != EXIT_SUCCESS)
+        {
+            IotLogInfo("Retrive Cloud command failed");
+            break;
+        }
+
         
     }
     IotLogInfo("left getThingshadow function, the status now is %d",status);
     return status;
 }
 
+/**
+ * Retrive the cloud shadow document and invoke the analyze function
+ * then send the command to ble provisioner
+ */
+static int retriveCloudCommand( IotMqttConnection_t mqttConnection,
+                                AwsIotShadowDocumentInfo_t getInfo,
+                                AwsIotShadowOperation_t getOperation,
+                                int status
+                                )
+{       
+    AwsIotShadowError_t result = AWS_IOT_SHADOW_STATUS_PENDING;
+
+    result = AwsIotShadow_Get(  mqttConnection,
+                                &getInfo,
+                                AWS_IOT_SHADOW_FLAG_WAITABLE,
+                                NULL,
+                                &getOperation);
+
+    const char *receivedDocument = NULL;
+    size_t receivedDocumentLength =0;    
+    if(result == AWS_IOT_SHADOW_STATUS_PENDING)//AWS_IOT_SHADOW_SUCCESS
+    {
+        result = AwsIotShadow_Wait( getOperation,
+                                    200000,//set 20 s as the time out so that it will wait for the operation done
+                                    &receivedDocument, 
+                                    &receivedDocumentLength );
+        assert( result != AWS_IOT_SHADOW_STATUS_PENDING );
+
+        // The retrieved Shadow document is only valid for a successful Shadow get.
+        if( result == AWS_IOT_SHADOW_SUCCESS )
+        {
+            IotLogInfo("Get Shadow document, begin to analyze the retrived shadow document");
+            
+            bool analyzeResult = false;
+            //process the document to get value needed
+            const char *receivedAttribute = NULL;
+            size_t receivedAttributeLength =0; 
+
+            analyzeResult = _getSpecificValue(  receivedDocument,
+                                            receivedDocumentLength,
+                                            "state",
+                                            "desired",
+                                            "Lights",
+                                            "ON_OFF",
+                                            &receivedAttribute,
+                                            &receivedAttributeLength
+                                            );
+            if(analyzeResult)
+            {
+                //write extracted command to uart
+                _write_command_into_uart(receivedAttribute,receivedAttributeLength);
+                status = EXIT_SUCCESS;
+            }
+            else
+            {
+                IotLogWarn("write specific value from received document failed");
+                status = EXIT_FAILURE;
+            }
+        //release the memory allocated to mallocDocument
+        free( (char*)receivedDocument );
+        }
+        else
+        {
+            IotLogWarn("Wait operation failed");
+            status = EXIT_FAILURE;
+        }
+    }
+    else
+    {
+        IotLogWarn("Retriving thing shadow document failed");
+        status = EXIT_FAILURE;
+    }
+    
+    // IotLogInfo("free heap size is %d bytes ",xPortGetMinimumEverFreeHeapSize());
+    // wait some time to get the second time shadow
+    // IotClock_SleepMs(500);
+    
+    return status;
+}
 
 /**
  * report the local changes to cloud, if the button on the switch is pressed,
@@ -690,7 +570,7 @@ static int reportLocalChange(   uint32_t length,
     //extract information from the data packet sent from bg13
 
     /*get the update operation type */
-    UpdateOperation_t operation = analysisOperation(data);
+    UpdateOperation_t analysisResult = analysisOperation(data);
     /*get the deviceType */
     Device_t deviceType = analysisDeviceType(data);
     /*get the attribute */
@@ -709,20 +589,27 @@ static int reportLocalChange(   uint32_t length,
     char *attributeValue = _getAttributeValue(attributeType, data);
     char* pUpdateDocument = NULL;
 
+    //if result is change endpoint state, then construct a shadow document
+    if(analysisResult == CHANGE_ENDPOINT_STATE)
+    {   
+        //generate the shadow document to send plus 20 to avoid data overflow
+        pUpdateDocument = generateControlShadowDocument( deviceType,
+                                                        attributeType,
+                                                        attributeValue
+                                                        );
 
-    //generate the shadow document to send plus 20 to avoid data overflow
-    pUpdateDocument = generateControlShadowDocument(operation, 
-                                                    deviceType,
-                                                    attributeType,
-                                                    attributeValue
-                                                    );
+    }
+    //TODO
+    // if(analysisResult == ADD_DEVICE )
 
+    /**update thing shadow document */
+    // IotLogInfo("shadow document generated is %s",pUpdateDocument);
     
     AwsIotShadowError_t updateResult = AWS_IOT_SHADOW_STATUS_PENDING;
     updateResult = wrapUpdateThingShadow(   pUpdateDocument,
-                                            mqttConnection,
-                                            pThingName,
-                                            thingNameLength );
+                                        mqttConnection,
+                                        pThingName,
+                                        thingNameLength );
     
     if( updateResult != AWS_IOT_SHADOW_SUCCESS )
     {
@@ -822,13 +709,13 @@ static UpdateOperation_t analysisOperation(uint8_t* data)
     UpdateOperation_t type = UNKNOWN_OP;
     if(data[0]=='1')
     {
-        type = CLOULD_CHANGE_ENDPOINT_STATE; 
-        IotLogInfo("the type is CLOULD_CHANGE_ENDPOINT_STATE");  
+        type = CHANGE_ENDPOINT_STATE; 
+        IotLogInfo("the type is CHANGE_ENDPOINT_STATE");  
     }
-    if (data[0]=='2')
+    if (data[0]=='0')
     {
-        type = LOCALLY_CHANGE_ENDPOINT_STATE;
-        IotLogInfo("the type is LOCALLY_CHANGE_ENDPOINT_STATE");  
+        type = ADD_DEVICE;
+        IotLogInfo("the type is ADD_DEVICE");  
     }
 
     return type;
@@ -922,64 +809,33 @@ static Attribute_t analysisAttribute(uint8_t* data)
  * everytime a specific attribute value changes but the rest are not, then the rest attributes
  * should be remain in their default value
  */
-static char* generateControlShadowDocument( UpdateOperation_t operation,
-                                            Device_t deviceType, 
+static char* generateControlShadowDocument(  Device_t deviceType, 
                                             Attribute_t attributeType,
                                             char *attributeValue
                                         )
 {
     int length = 0;
+    static char pUpdateDocument[ SHADOW_REPORTED_JSON_SIZE + 20 ] = { 0 };
+    if(deviceType == LIGHT && attributeType == ON_OFF)
+    {
+        length = sprintf(   pUpdateDocument,
+                            SHADOW_REPORTED_LIGHT_JSON,
+                            attributeValue,
+                            (int)D_Temperature,
+                            ( long unsigned ) ( IotClock_GetTimeMs() % 1000000 ) ); //the clienToken
 
-    static char pUpdateDocument[ SHADOW_REPORTED_JSON_SIZE + SHADOW_DESIRED_JSON_SIZE +20 ] = { 0 };
-    if(operation == LOCALLY_CHANGE_ENDPOINT_STATE){
-        if(deviceType == LIGHT && attributeType == ON_OFF)
-        {
-            length = sprintf(   pUpdateDocument,
-                                SHADOW_LIGHT_JSON,
-                                attributeValue,
-                                (int)D_Temperature,
-                                attributeValue,
-                                (int)D_Temperature,
-                                ( long unsigned ) ( IotClock_GetTimeMs() % 1000000 ) ); //the clienToken
-
-            IotLogInfo("document generated is %.*s: ",length,pUpdateDocument);
-        }
-        if(deviceType == LIGHT && attributeType == TEMPERATURE)
-        {
-            length = sprintf(   pUpdateDocument,
-                                SHADOW_LIGHT_JSON,
-                                "ON",
-                                atoi(attributeValue),
-                                "ON",
-                                atoi(attributeValue),
-                                ( long unsigned ) ( IotClock_GetTimeMs() % 1000000 ) ); //the clienToken
-
-            IotLogInfo("document generated is %.*s: ",length,pUpdateDocument);
-        }            
+        IotLogInfo("document generated is %.*s: ",length,pUpdateDocument);
     }
-    else if(operation == CLOULD_CHANGE_ENDPOINT_STATE){
-        if(deviceType == LIGHT && attributeType == ON_OFF)
-        {
-            length = sprintf(   pUpdateDocument,
-                                SHADOW_REPORTED_LIGHT_JSON,
-                                attributeValue,
-                                (int)D_Temperature,
-                                ( long unsigned ) ( IotClock_GetTimeMs() % 1000000 ) ); //the clienToken
+    if(deviceType == LIGHT && attributeType == TEMPERATURE)
+    {
+        length = sprintf(   pUpdateDocument,
+                            SHADOW_REPORTED_LIGHT_JSON,
+                            "ON",
+                            atoi(attributeValue),
+                            ( long unsigned ) ( IotClock_GetTimeMs() % 1000000 ) ); //the clienToken
 
-            IotLogInfo("document generated is %.*s: ",length,pUpdateDocument);
-        }
-        if(deviceType == LIGHT && attributeType == TEMPERATURE)
-        {
-            length = sprintf(   pUpdateDocument,
-                                SHADOW_REPORTED_LIGHT_JSON,
-                                "ON",
-                                atoi(attributeValue),
-                                ( long unsigned ) ( IotClock_GetTimeMs() % 1000000 ) ); //the clienToken
-
-            IotLogInfo("document generated is %.*s: ",length,pUpdateDocument);
-        }
+        IotLogInfo("document generated is %.*s: ",length,pUpdateDocument);
     }
-
     return pUpdateDocument;
 }
 /**
@@ -1085,13 +941,9 @@ int RunShadowDemo(bool awsIotMqttMode,
     /* Length of Shadow Thing Name. */
     size_t thingNameLength = 0;
 
-    /* Allows the Shadow update function to wait for the delta callback to complete
-     * a state change before continuing. */
-    IotSemaphore_t deltaSemaphore;
-
     /* Flags for tracking which cleanup functions must be called. */
     bool librariesInitialized = false, connectionEstablished = false;
-    bool deltaSemaphoreCreated = false;
+    // bool deltaSemaphoreCreated = false
 
     /* The first parameter of this demo function is not used. Shadows are specific
      * to AWS IoT, so this value is hardcoded to true whenever needed. */
@@ -1141,30 +993,13 @@ int RunShadowDemo(bool awsIotMqttMode,
     {
         /* Mark the MQTT connection as established. */
         connectionEstablished = true;
-
-        /* Create the semaphore that synchronizes with the delta callback. */
-        deltaSemaphoreCreated = IotSemaphore_Create( &deltaSemaphore, 0, 1 );
-
-        if( deltaSemaphoreCreated == false )
-        {
-            status = EXIT_FAILURE;
-        }
     }
 
-    if( status == EXIT_SUCCESS )
-    {
-        /* Set the Shadow callbacks for this demo. */
-        status = _setShadowCallbacks( &deltaSemaphore,
-                                      mqttConnection,
-                                      pIdentifier,
-                                      thingNameLength );
-    }
 
     if(status == EXIT_SUCCESS)
     {
         IotLogInfo("free heap size is %d bytes ",xPortGetFreeHeapSize());
-        status = _thingShadowOperation( &deltaSemaphore,
-                                        mqttConnection,
+        status = _thingShadowOperation( mqttConnection,
                                         pIdentifier,
                                         thingNameLength);
     }
@@ -1180,11 +1015,6 @@ int RunShadowDemo(bool awsIotMqttMode,
     if (librariesInitialized == true)
     {
         _cleanupDemo();
-    }
-    /* Destroy the delta semaphore if it was created. */
-    if( deltaSemaphoreCreated == true )
-    {
-        IotSemaphore_Destroy( &deltaSemaphore );
     }
     return status;
 }
